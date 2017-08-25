@@ -2,7 +2,6 @@ package com.company;
 
 import com.sun.org.apache.xml.internal.serializer.OutputPropertiesFactory;
 import org.w3c.dom.*;
-
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -20,6 +19,7 @@ public class MainCommandHandler {
     private static String workingDirectory;
     private FileHandler mFileHandler;
     private static int targetRow = -1;
+    private static boolean hasCsv = false;
 
 
     public MainCommandHandler() {
@@ -36,7 +36,14 @@ public class MainCommandHandler {
                 print("Please set working directory");
                 lastInput = mScanner.next();
                 workingDirectory = lastInput;
-            } else if(targetRow < 0) {
+            }
+            else if(hasCsv == false) {
+                print("No CSV found!! Please add CSV file and enter retry to try again");
+                lastInput = mScanner.next();
+                processCommand(lastInput);
+            }
+
+            else if(targetRow < 0) {
                 print("Please set target data row from csv.");
                 targetRow = mScanner.nextInt();
             }
@@ -52,7 +59,11 @@ public class MainCommandHandler {
 
     private void processCommand(String command) {
         try {
-            if (command.equals("help")) {
+            if (command.equals("retry")){
+               mFileHandler.processDirectory(new File(workingDirectory));
+            }
+
+            else if (command.equals("help")) {
                 print("Valid commands:\n [update,stringAttribute]\n [set,stringAttribute]\n [delete,stringAttribute]");
             } else if (command.contains("set")) {
                 String[] commandPair = command.split(",");
@@ -68,7 +79,11 @@ public class MainCommandHandler {
                 targetRow = mScanner.nextInt();
                 print("target row set to: " + targetRow);
 
-            } else {
+            } else if (command.contains("exit")){
+                print("exiting android localization tool ");
+                System.exit(0);
+            }
+            else {
                 print("Invalid Command syntax. Try again. Command: " + command);
             }
 
@@ -101,7 +116,7 @@ public class MainCommandHandler {
             } else {
                 //Only load
                 if (locales.isEmpty()) {
-                    loadCsv(file);
+                    processDirectory(file);
                 }
             }
             return file.exists();
@@ -251,9 +266,11 @@ public class MainCommandHandler {
             return -1;
         }
 
-        private void loadCsv(File dir) {
+        private void processDirectory(File dir) {
+            localeFolders.clear();
             for (String name : dir.list()) {
                 if (name.endsWith(".csv")) {
+                    hasCsv = true;
                     parseCsv(name);
                 }
                 else if (name.contains("values")) {
@@ -262,6 +279,7 @@ public class MainCommandHandler {
                     }
                 }
             }
+
         }
 
 
