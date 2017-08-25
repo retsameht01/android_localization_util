@@ -251,10 +251,6 @@ public class MainCommandHandler {
         }
 
         private int getTranslationIndex(String locale) {
-            //we don't have croatia (hr) but  we have serbo croatia use that instead
-            if(locale.equals("hr")) {
-                locale = "sr";
-            }
             int index = 0;
             for (String csvLocale : locales) {
                 csvLocale = csvLocale.trim();
