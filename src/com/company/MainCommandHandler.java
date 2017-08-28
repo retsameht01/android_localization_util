@@ -69,7 +69,12 @@ public class MainCommandHandler {
                 String[] commandPair = command.split(",");
                 String xmlTag = commandPair[1];
                 mFileHandler.insertTranslationTag(xmlTag);
-            } else if (command.contains("update")) {
+            } else if(command.contains("updateAdd")) {
+                String[] commandPair = command.split(",");
+                String xmlTag = commandPair[1];
+                mFileHandler.appendTag(xmlTag, commandPair[2]);
+            }
+            else if (command.contains("update")) {
                 String[] commandPair = command.split(",");
                 String xmlTag = commandPair[1];
                 mFileHandler.updateTranslationTag(xmlTag);
@@ -123,20 +128,27 @@ public class MainCommandHandler {
         }
 
 
-        private void insertTranslationTag(String stringName) {
+        private void insertTranslationTag(String tagName) {
             for (String folder : localeFolders) {
                 String resStringFile = workingDirectory + "/" + folder + "/strings.xml";
-                insertStringResource(stringName, resStringFile, getLocaleCodeFromFolderName(folder));
+                insertStringResource(tagName, resStringFile, getLocaleCodeFromFolderName(folder));
             }
 
         }
 
-        private void updateTranslationTag(String stringName) {
+        private void updateTranslationTag(String tagName) {
             for (String folder : localeFolders) {
                 String resStringFile = workingDirectory + "/" + folder + "/strings.xml";
-                updateStringResource(stringName, resStringFile, getLocaleCodeFromFolderName(folder));
+                updateStringResource(tagName, resStringFile, getLocaleCodeFromFolderName(folder), false, null);
             }
 
+        }
+
+        private void appendTag(String tagName, String appendString) {
+            for (String folder : localeFolders) {
+                String resStringFile = workingDirectory + "/" + folder + "/strings.xml";
+                updateStringResource(tagName, resStringFile, getLocaleCodeFromFolderName(folder),true, appendString);
+            }
         }
 
         private Element getTargetElement(NodeList nodeList, String resName) {
@@ -154,7 +166,7 @@ public class MainCommandHandler {
             return result;
         }
 
-        private void updateStringResource(String resName, String file, String locale) {
+        private void updateStringResource(String resName, String file, String locale, boolean isAppend, String appendString) {
             try {
                 DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
                 Document document = documentBuilder.parse(file);
@@ -165,14 +177,18 @@ public class MainCommandHandler {
                 }
 
                 String localizedText = dataRows.get(targetRow).get(translationIndex);
-
                 localizedText = processStringForSave(localizedText);
+
                 Element root = document.getDocumentElement();
                 Element element = getTargetElement(root.getElementsByTagName("string"), resName);
                 if (element == null) {
                     element = document.createElement("string");
                     element.setAttribute("name", resName);
                     root.appendChild(element);
+                }
+
+                if (isAppend) {
+                   localizedText = element.getTextContent() +  appendString;
                 }
 
                 element.setTextContent(localizedText);
