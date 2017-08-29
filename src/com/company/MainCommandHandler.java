@@ -2,6 +2,8 @@ package com.company;
 
 import com.sun.org.apache.xml.internal.serializer.OutputPropertiesFactory;
 import org.w3c.dom.*;
+import org.w3c.dom.stylesheets.StyleSheet;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -9,9 +11,7 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.*;
 import java.util.*;
 
 public class MainCommandHandler {
@@ -73,7 +73,12 @@ public class MainCommandHandler {
                 String[] commandPair = command.split(",");
                 String xmlTag = commandPair[1];
                 mFileHandler.appendTag(xmlTag, commandPair[2]);
+            }else if(command.contains("updateReplace")) {
+                String[] commandPair = command.split(",");
+                String xmlTag = commandPair[1];
+                mFileHandler.replaceTag(xmlTag);
             }
+
             else if (command.contains("update")) {
                 String[] commandPair = command.split(",");
                 String xmlTag = commandPair[1];
@@ -151,6 +156,13 @@ public class MainCommandHandler {
             }
         }
 
+        private void replaceTag(String tagName) {
+            for (String folder : localeFolders) {
+                String resStringFile = workingDirectory + "/" + folder + "/strings.xml";
+                replaceNonBreakingSpaceToHtmlCode(tagName, resStringFile, getLocaleCodeFromFolderName(folder));
+            }
+        }
+
         private Element getTargetElement(NodeList nodeList, String resName) {
             Element result = null;
 
@@ -166,7 +178,75 @@ public class MainCommandHandler {
             return result;
         }
 
+        private void replaceHtmlEscapes(NodeList stringNodes) {
+            for (int i = 0; i < stringNodes.getLength(); i++) {
+                Element element = (Element) stringNodes.item(i);
+                if (element != null){
+                    String content = element.getTextContent();
+                    if(element.getAttribute("name").equals("fahrenheit_temperature")) {
+                        content = content.replace("&amp;", "&");
+                        element.setTextContent(content);
+                        System.out.println("replacing " + "&# with " + content);
+                    }
+
+                }
+            }
+
+        }
+
+        private void replaceNonBreakingSpaceToHtmlCode(String resName, String file, String locale){
+            try {
+                DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+                Document document = documentBuilder.parse(file);
+                int translationIndex = getTranslationIndex(locale);
+                if (translationIndex < 0) {
+                    print("no translation column for: " + locale);
+                    return;
+                }
+
+                Element root = document.getDocumentElement();
+                NodeList nodeList = root.getElementsByTagName("string");
+
+                for (int i = 0; i < nodeList.getLength(); i++) {
+                    Element element = (Element) nodeList.item(i);
+                    if (element != null){
+                        String content = element.getTextContent();
+                        if(element.getAttribute("name").equals(resName)) {
+                            content = content.substring(0,content.length() -1);
+                            content += "&#160;";
+                            element.setTextContent(content);
+                            print("Done adding tag to: " + file + " content : " + content);
+                        }
+
+                    }
+                }
+                //element.setTextContent(localizedText);
+
+
+                //Save the tag
+                TransformerFactory transformerFactory = TransformerFactory.newInstance();
+                Transformer transformer = transformerFactory.newTransformer();
+                //transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+                transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+                transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+                transformer.setOutputProperty(OutputPropertiesFactory.S_KEY_INDENT_AMOUNT, "4");
+                //transformerFactory.setAttribute("indent-number",49);
+                //transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+                DOMSource source = new DOMSource(document);
+                StreamResult result = new StreamResult(new File(file));
+                transformer.transform(source, result);
+
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
         private void updateStringResource(String resName, String file, String locale, boolean isAppend, String appendString) {
+            replaceHtmlEncoding(file);
+
             try {
                 DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
                 Document document = documentBuilder.parse(file);
@@ -181,6 +261,8 @@ public class MainCommandHandler {
 
                 Element root = document.getDocumentElement();
                 Element element = getTargetElement(root.getElementsByTagName("string"), resName);
+                //Keep original html entity
+                //replaceHtmlEscapes(root.getElementsByTagName("string"));
                 if (element == null) {
                     element = document.createElement("string");
                     element.setAttribute("name", resName);
@@ -193,12 +275,15 @@ public class MainCommandHandler {
 
                 element.setTextContent(localizedText);
 
+
                 //Save the tag
                 TransformerFactory transformerFactory = TransformerFactory.newInstance();
                 Transformer transformer = transformerFactory.newTransformer();
-                transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                //transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
                 transformer.setOutputProperty(OutputKeys.INDENT, "yes");
                 transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+                transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
                 transformer.setOutputProperty(OutputPropertiesFactory.S_KEY_INDENT_AMOUNT, "4");
                 //transformerFactory.setAttribute("indent-number",49);
                 //transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
@@ -210,6 +295,8 @@ public class MainCommandHandler {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
+            putBackHtmlEncoding(file);
         }
 
         private void insertStringResource(String resourceName, String file, String locale) {
@@ -296,6 +383,57 @@ public class MainCommandHandler {
                 }
             }
 
+        }
+
+        private void replaceHtmlEncoding(String fileName) {
+            print("replace html encoding ");
+
+            try
+            {
+                File file = new File(fileName);
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                String line = "", oldtext = "";
+                while((line = reader.readLine()) != null)
+                {
+                    oldtext += line + "\r\n";
+                }
+                reader.close();
+
+                String replacedtext  = oldtext.replaceAll("&", "&amp;");
+                FileWriter writer = new FileWriter(fileName);
+                writer.write(replacedtext);
+                writer.close();
+
+            }
+            catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
+        }
+
+        private void putBackHtmlEncoding(String fileName) {
+            print("put back encoding");
+            try
+            {
+                File file = new File(fileName);
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                String line = "", oldtext = "";
+                while((line = reader.readLine()) != null)
+                {
+                    oldtext += line + "\r\n";
+                }
+                reader.close();
+
+                String replacedtext  = oldtext.replaceAll("&amp;", "&");
+                FileWriter writer = new FileWriter(fileName);
+                writer.write(replacedtext);
+                writer.close();
+
+            }
+            catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
         }
 
 
