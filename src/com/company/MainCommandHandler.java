@@ -113,6 +113,7 @@ public class MainCommandHandler {
         private List<String> localeFolders;
         private HashMap<Integer, List<String>> dataRows;
 
+
         FileHandler() {
             locales = new ArrayList<>();
             dataRows = new HashMap<>();
@@ -246,6 +247,7 @@ public class MainCommandHandler {
 
         private void updateStringResource(String resName, String file, String locale, boolean isAppend, String appendString) {
             replaceHtmlEncoding(file);
+            boolean isNew = false;
 
             try {
                 DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -267,6 +269,7 @@ public class MainCommandHandler {
                     element = document.createElement("string");
                     element.setAttribute("name", resName);
                     root.appendChild(element);
+                    isNew = true;
                 }
 
                 if (isAppend) {
@@ -284,7 +287,9 @@ public class MainCommandHandler {
                 transformer.setOutputProperty(OutputKeys.METHOD, "xml");
                 transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
                 transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-                transformer.setOutputProperty(OutputPropertiesFactory.S_KEY_INDENT_AMOUNT, "4");
+
+                //THis does not work, setting the indentation
+                //transformer.setOutputProperty(OutputPropertiesFactory.S_KEY_INDENT_AMOUNT, "4");
                 //transformerFactory.setAttribute("indent-number",49);
                 //transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
                 DOMSource source = new DOMSource(document);
@@ -295,8 +300,12 @@ public class MainCommandHandler {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            if (!isNew) {
+                putBackHtmlEncoding(file, "");
+            } else {
+                putBackHtmlEncoding(file, resName);
+            }
 
-            putBackHtmlEncoding(file);
         }
 
         private void insertStringResource(String resourceName, String file, String locale) {
@@ -411,7 +420,7 @@ public class MainCommandHandler {
             }
         }
 
-        private void putBackHtmlEncoding(String fileName) {
+        private void putBackHtmlEncoding(String fileName, String newTag) {
             print("put back encoding");
             try
             {
@@ -425,6 +434,11 @@ public class MainCommandHandler {
                 reader.close();
 
                 String replacedtext  = oldtext.replaceAll("&amp;", "&");
+
+                //<string name="newtag"
+
+                replacedtext = replacedtext.replace("<string name=\"" + newTag, "\t<string name=\"" + newTag);
+
                 FileWriter writer = new FileWriter(fileName);
                 writer.write(replacedtext);
                 writer.close();
